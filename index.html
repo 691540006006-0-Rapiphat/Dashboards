@@ -256,7 +256,6 @@
             statusEl.innerHTML = `<span class="w-2 h-2 mr-2 bg-amber-400 rounded-full animate-ping"></span> Syncing...`;
             statusEl.className = "inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-amber-950/60 text-amber-400 border border-amber-800/50";
 
-            // รายการช่องทางสำหรับดึงข้อมูลเพื่อแก้ปัญหา CORS
             const endpoints = [
                 'https://api.allorigins.win/raw?url=' + encodeURIComponent(targetUrl),
                 'https://corsproxy.io/?' + encodeURIComponent(targetUrl),
@@ -301,6 +300,17 @@
             }
         }
 
+        // แปลงข้อความให้เป็นตัวเลขที่ถูกต้อง ป้องกันค่าเพี้ยนจาก Timestamp
+        function cleanNumber(val) {
+            if (val === undefined || val === null) return NaN;
+            // ถ้าเป็นรูปแบบวันที่/เวลา ไม่เอา
+            if (String(val).includes('/') || String(val).includes(':')) return NaN;
+            
+            const cleaned = String(val).replace(/[^0-9.-]/g, '');
+            if (cleaned === '' || isNaN(cleaned)) return NaN;
+            return parseFloat(cleaned);
+        }
+
         function processAndDisplayData(headers, rows) {
             const labels = [];
             const tempData = [];
@@ -312,23 +322,31 @@
             rows.forEach((row, index) => {
                 if (!row || row.length === 0) return;
 
-                const rawTime = row.find(v => v.includes('/') || v.includes(':') || v.includes('-')) || row[0] || `Row #${index + 1}`;
-                const timestamp = rawTime.replace(/"/g, '');
+                // คอลัมน์ที่ 0 = Timestamp
+                const timestamp = row[0] ? row[0].replace(/"/g, '') : `Row #${index + 1}`;
 
-                const numerics = [];
-                row.forEach(val => {
-                    const cleaned = val.replace(/[^0-9.-]/g, '');
-                    if (cleaned !== '' && !isNaN(cleaned)) {
-                        numerics.push(parseFloat(cleaned));
+                // ดึงเฉพาะตัวเลขจากคอลัมน์ที่ไม่ใช่ Timestamp
+                let temp = NaN;
+                let humidity = NaN;
+
+                // ตรวจสอบคอลัมน์ 1 และ 2 ตามลำดับ
+                if (row.length > 1) temp = cleanNumber(row[1]);
+                if (row.length > 2) humidity = cleanNumber(row[2]);
+
+                // หากตำแหน่งตายตัวไม่มี ให้ลองค้นหาคอลัมน์ที่มีตัวเลขปกติ
+                if (isNaN(temp) || isNaN(humidity)) {
+                    const validNums = [];
+                    for (let i = 0; i < row.length; i++) {
+                        const num = cleanNumber(row[i]);
+                        if (!isNaN(num)) validNums.push(num);
                     }
-                });
-
-                const temp = numerics.length > 0 ? numerics[0] : 0;
-                const humidity = numerics.length > 1 ? numerics[1] : 0;
+                    if (isNaN(temp) && validNums.length > 0) temp = validNums[0];
+                    if (isNaN(humidity) && validNums.length > 1) humidity = validNums[1];
+                }
 
                 labels.push(timestamp);
-                tempData.push(temp);
-                humidityData.push(humidity);
+                tempData.push(isNaN(temp) ? 0 : temp);
+                humidityData.push(isNaN(humidity) ? 0 : humidity);
             });
 
             // ตารางแสดงผลข้อมูลล่าสุดอยู่ด้านบนสุด
@@ -336,26 +354,27 @@
             reversedRows.forEach((row, index) => {
                 if (!row || row.length === 0) return;
 
-                const rawTime = row.find(v => v.includes('/') || v.includes(':') || v.includes('-')) || row[0] || '-';
-                const timestamp = rawTime.replace(/"/g, '');
+                const timestamp = row[0] ? row[0].replace(/"/g, '') : '-';
 
-                const numerics = [];
-                row.forEach(val => {
-                    const cleaned = val.replace(/[^0-9.-]/g, '');
-                    if (cleaned !== '' && !isNaN(cleaned)) {
-                        numerics.push(parseFloat(cleaned));
+                let tempVal = row.length > 1 ? cleanNumber(row[1]) : NaN;
+                let humVal = row.length > 2 ? cleanNumber(row[2]) : NaN;
+
+                if (isNaN(tempVal) || isNaN(humVal)) {
+                    const validNums = [];
+                    for (let i = 0; i < row.length; i++) {
+                        const num = cleanNumber(row[i]);
+                        if (!isNaN(num)) validNums.push(num);
                     }
-                });
-
-                const tempVal = numerics.length > 0 ? numerics[0] : '--';
-                const humVal = numerics.length > 1 ? numerics[1] : '--';
+                    if (isNaN(tempVal) && validNums.length > 0) tempVal = validNums[0];
+                    if (isNaN(humVal) && validNums.length > 1) humVal = validNums[1];
+                }
 
                 const tr = document.createElement('tr');
                 tr.className = "hover:bg-zinc-800/30 transition-colors";
                 tr.innerHTML = `
                     <td class="px-6 py-4 font-mono text-xs text-zinc-400">${timestamp}</td>
-                    <td class="px-6 py-4 font-semibold text-amber-400">${tempVal} °C</td>
-                    <td class="px-6 py-4 font-semibold text-indigo-400">${humVal} %</td>
+                    <td class="px-6 py-4 font-semibold text-amber-400">${!isNaN(tempVal) ? tempVal + ' °C' : '--'}</td>
+                    <td class="px-6 py-4 font-semibold text-indigo-400">${!isNaN(humVal) ? humVal + ' %' : '--'}</td>
                 `;
                 tableBody.appendChild(tr);
             });
@@ -363,19 +382,23 @@
             // อัปเดตข้อมูลบน Metric Cards
             if (rows.length > 0) {
                 const lastRow = rows[rows.length - 1];
-                const lastTimeRaw = lastRow.find(v => v.includes('/') || v.includes(':') || v.includes('-')) || lastRow[0] || 'Recently';
-                const lastTime = lastTimeRaw.replace(/"/g, '');
+                const lastTime = lastRow[0] ? lastRow[0].replace(/"/g, '') : 'Recently';
 
-                const lastNumerics = [];
-                lastRow.forEach(val => {
-                    const cleaned = val.replace(/[^0-9.-]/g, '');
-                    if (cleaned !== '' && !isNaN(cleaned)) {
-                        lastNumerics.push(parseFloat(cleaned));
+                let lastTemp = lastRow.length > 1 ? cleanNumber(lastRow[1]) : NaN;
+                let lastHum = lastRow.length > 2 ? cleanNumber(lastRow[2]) : NaN;
+
+                if (isNaN(lastTemp) || isNaN(lastHum)) {
+                    const validNums = [];
+                    for (let i = 0; i < lastRow.length; i++) {
+                        const num = cleanNumber(lastRow[i]);
+                        if (!isNaN(num)) validNums.push(num);
                     }
-                });
+                    if (isNaN(lastTemp) && validNums.length > 0) lastTemp = validNums[0];
+                    if (isNaN(lastHum) && validNums.length > 1) lastHum = validNums[1];
+                }
 
-                document.getElementById('latest-temp').textContent = lastNumerics.length > 0 ? lastNumerics[0] : '--';
-                document.getElementById('latest-humidity').textContent = lastNumerics.length > 1 ? lastNumerics[1] : (lastNumerics.length > 0 ? 0 : '--');
+                document.getElementById('latest-temp').textContent = !isNaN(lastTemp) ? lastTemp : '--';
+                document.getElementById('latest-humidity').textContent = !isNaN(lastHum) ? lastHum : '--';
                 
                 document.getElementById('temp-status').innerHTML = `<i class="fa-regular fa-clock mr-1.5"></i> Updated: ${lastTime}`;
                 document.getElementById('humidity-status').innerHTML = `<i class="fa-regular fa-clock mr-1.5"></i> Updated: ${lastTime}`;
@@ -396,7 +419,7 @@
         window.onload = () => {
             initCharts();
             fetchData();
-            setInterval(fetchData, 30000); // อัปเดตอัตโนมัติทุกๆ 30 วินาที
+            setInterval(fetchData, 30000);
         };
     </script>
 </body>
