@@ -1,418 +1,244 @@
 <!DOCTYPE html>
-<html lang="en" class="h-full bg-zinc-950">
+<html lang="th">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Rapiphat Nasinprom - Climate Dashboard</title>
-    <!-- Tailwind CSS CDN -->
-    <script src="https://cdn.tailwindcss.com"></script>
-    <!-- Chart.js CDN -->
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <!-- FontAwesome for Icons -->
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <!-- Google Fonts Plus Jakarta Sans -->
-    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <title>Kalasin Weather & IoT Sensor Dashboard</title>
     <style>
-        body { font-family: 'Plus Jakarta Sans', sans-serif; }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f0f2f5;
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            justify-content: center;
+        }
+
+        .dashboard-container {
+            width: 100%;
+            max-width: 900px;
+        }
+
+        .header-card {
+            background-color: white;
+            border-radius: 10px;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+        }
+
+        .header-card h1 {
+            margin: 0 0 10px 0;
+            color: #1c2b36;
+            font-size: 24px;
+        }
+
+        .sheet-info {
+            color: #6c757d;
+            font-size: 14px;
+        }
+
+        .cards-container {
+            display: flex;
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+
+        .info-card {
+            flex: 1;
+            border-radius: 10px;
+            padding: 20px;
+            color: white;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        .temp-card {
+            background-color: #f39c12;
+        }
+
+        .humidity-card {
+            background-color: #17a2b8;
+        }
+
+        .card-title {
+            font-size: 14px;
+            margin-bottom: 10px;
+            font-weight: bold;
+        }
+
+        .card-value {
+            font-size: 48px;
+            font-weight: bold;
+            margin: 0;
+        }
+
+        .chart-card {
+            background-color: white;
+            border-radius: 10px;
+            padding: 20px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+        }
+
+        canvas {
+            width: 100% !important;
+            height: 400px !important;
+        }
     </style>
+    <!-- Include Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
-<body class="bg-zinc-950 text-zinc-100 h-full flex flex-col antialiased selection:bg-indigo-500 selection:text-white">
+<body>
 
-    <!-- Header Section -->
-    <header class="bg-zinc-900/80 backdrop-blur-md border-b border-zinc-800/80 sticky top-0 z-50">
-        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
-            <div class="flex items-center space-x-3">
-                <div class="w-10 h-10 rounded-2xl bg-gradient-to-tr from-indigo-600 to-violet-500 flex items-center justify-center text-white shadow-lg shadow-indigo-500/20">
-                    <i class="fa-solid fa-gauge-high text-lg"></i>
-                </div>
-                <div>
-                    <h1 class="text-lg font-bold text-white tracking-tight leading-tight">
-                        Sensor Dashboard <span class="text-indigo-400 font-semibold">Rapiphat Nasinprom</span>
-                    </h1>
-                    <p class="text-xs text-zinc-400">Live Temperature & Humidity Analytics</p>
-                </div>
-            </div>
-            
-            <div class="flex items-center space-x-3">
-                <div id="connection-status" class="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-emerald-950/60 text-emerald-400 border border-emerald-800/50">
-                    <span class="w-2 h-2 mr-2 bg-emerald-400 rounded-full animate-pulse"></span> Connected
-                </div>
-                <button onclick="fetchData()" class="inline-flex items-center px-4 py-2 border border-zinc-700 text-xs font-semibold rounded-xl text-zinc-200 bg-zinc-800/80 hover:bg-zinc-700 hover:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500 transition shadow-sm">
-                    <i class="fa-solid fa-rotate mr-2"></i> Sync Data
-                </button>
-            </div>
+<div class="dashboard-container">
+    <!-- Header -->
+    <div class="header-card">
+        <h1>Kalasin Weather & IoT Sensor Dashboard ภาคิน ไกรวิเศษ</h1>
+        <div class="sheet-info">สถานะ: <span id="status-text" style="color: green;">กำลังซิงค์ข้อมูลกับ Google Sheets...</span></div>
+    </div>
+
+    <!-- Info Cards -->
+    <div class="cards-container">
+        <div class="info-card temp-card">
+            <div class="card-title">อุณหภูมิปัจจุบัน</div>
+            <div class="card-value" id="current-temp">-- °C</div>
         </div>
-    </header>
-
-    <!-- Main Content Area -->
-    <main class="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8 overflow-y-auto">
-
-        <!-- Top Metrics Cards -->
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <!-- Temperature Card -->
-            <div class="bg-zinc-900/60 rounded-3xl p-6 border border-zinc-800/80 shadow-xl relative overflow-hidden group hover:border-indigo-500/40 transition-all duration-300">
-                <div class="absolute -right-8 -top-8 w-36 h-36 bg-amber-500/10 rounded-full blur-2xl group-hover:bg-amber-500/20 transition-all"></div>
-                <div class="flex items-start justify-between">
-                    <div>
-                        <span class="text-xs font-bold uppercase tracking-wider text-amber-400/90 bg-amber-500/10 px-2.5 py-1 rounded-lg border border-amber-500/20">Latest Temperature</span>
-                        <div class="flex items-baseline mt-4">
-                            <span id="latest-temp" class="text-5xl font-black text-white tracking-tight">--</span>
-                            <span class="ml-1.5 text-2xl font-bold text-zinc-400">°C</span>
-                        </div>
-                        <p id="temp-status" class="text-xs text-zinc-400 mt-3 flex items-center">
-                            <i class="fa-regular fa-clock mr-1.5"></i> Waiting for telemetry...
-                        </p>
-                    </div>
-                    <div class="w-14 h-14 rounded-2xl bg-gradient-to-br from-amber-500/20 to-orange-500/10 border border-amber-500/20 text-amber-400 flex items-center justify-center text-2xl shadow-inner">
-                        <i class="fa-solid fa-temperature-high"></i>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Humidity Card -->
-            <div class="bg-zinc-900/60 rounded-3xl p-6 border border-zinc-800/80 shadow-xl relative overflow-hidden group hover:border-indigo-500/40 transition-all duration-300">
-                <div class="absolute -right-8 -top-8 w-36 h-36 bg-indigo-500/10 rounded-full blur-2xl group-hover:bg-indigo-500/20 transition-all"></div>
-                <div class="flex items-start justify-between">
-                    <div>
-                        <span class="text-xs font-bold uppercase tracking-wider text-indigo-400/90 bg-indigo-500/10 px-2.5 py-1 rounded-lg border border-indigo-500/20">Latest Humidity</span>
-                        <div class="flex items-baseline mt-4">
-                            <span id="latest-humidity" class="text-5xl font-black text-white tracking-tight">--</span>
-                            <span class="ml-1.5 text-2xl font-bold text-zinc-400">%</span>
-                        </div>
-                        <p id="humidity-status" class="text-xs text-zinc-400 mt-3 flex items-center">
-                            <i class="fa-regular fa-clock mr-1.5"></i> Waiting for telemetry...
-                        </p>
-                    </div>
-                    <div class="w-14 h-14 rounded-2xl bg-gradient-to-br from-indigo-500/20 to-violet-500/10 border border-indigo-500/20 text-indigo-400 flex items-center justify-center text-2xl shadow-inner">
-                        <i class="fa-solid fa-droplet"></i>
-                    </div>
-                </div>
-            </div>
+        <div class="info-card humidity-card">
+            <div class="card-title">ความชื้นปัจจุบัน</div>
+            <div class="card-value" id="current-humid">-- %</div>
         </div>
+    </div>
 
-        <!-- Charts Grid -->
-        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <!-- Temp Chart -->
-            <div class="bg-zinc-900/60 rounded-3xl p-6 border border-zinc-800/80 shadow-xl flex flex-col">
-                <div class="flex items-center justify-between mb-6">
-                    <div class="flex items-center space-x-2">
-                        <div class="w-2 h-2 rounded-full bg-amber-400"></div>
-                        <h2 class="text-sm font-bold text-zinc-200">Temperature Trend</h2>
-                    </div>
-                    <span class="text-xs text-zinc-500 font-medium bg-zinc-800/50 px-2.5 py-1 rounded-lg">Realtime</span>
-                </div>
-                <div class="relative flex-1 min-h-[280px]">
-                    <canvas id="tempChart"></canvas>
-                </div>
-            </div>
+    <!-- Chart -->
+    <div class="chart-card">
+        <canvas id="weatherChart"></canvas>
+    </div>
+</div>
 
-            <!-- Humidity Chart -->
-            <div class="bg-zinc-900/60 rounded-3xl p-6 border border-zinc-800/80 shadow-xl flex flex-col">
-                <div class="flex items-center justify-between mb-6">
-                    <div class="flex items-center space-x-2">
-                        <div class="w-2 h-2 rounded-full bg-indigo-400"></div>
-                        <h2 class="text-sm font-bold text-zinc-200">Humidity Trend</h2>
-                    </div>
-                    <span class="text-xs text-zinc-500 font-medium bg-zinc-800/50 px-2.5 py-1 rounded-lg">Realtime</span>
-                </div>
-                <div class="relative flex-1 min-h-[280px]">
-                    <canvas id="humidityChart"></canvas>
-                </div>
-            </div>
-        </div>
+<script>
+    // ใส่ลิงก์ CSV ที่คุณให้มา
+    const csvUrl = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vT4f3IKm103HfpLE_1tlE2k-6XIaYlSJwigKrqOHX7ALqM-qjufkvLFsMPwMFaWi0IIpsgqWoXJ_nhN/pub?gid=0&single=true&output=csv'; 
 
-        <!-- Table Section -->
-        <div class="bg-zinc-900/60 rounded-3xl border border-zinc-800/80 shadow-xl overflow-hidden">
-            <div class="px-6 py-5 border-b border-zinc-800/80 flex items-center justify-between bg-zinc-900/40">
-                <h2 class="text-sm font-bold text-zinc-200 flex items-center">
-                    <i class="fa-solid fa-list-check text-indigo-400 mr-2.5"></i> Historical Records
-                </h2>
-                <span id="record-count" class="text-xs font-semibold text-zinc-400 bg-zinc-800/80 px-3 py-1 rounded-xl border border-zinc-700/50">0 entries</span>
-            </div>
-            <div class="overflow-x-auto">
-                <table class="w-full text-left border-collapse">
-                    <thead>
-                        <tr class="bg-zinc-950/50 text-zinc-400 text-xs font-semibold uppercase tracking-wider border-b border-zinc-800/80">
-                            <th class="px-6 py-4">Timestamp / Row</th>
-                            <th class="px-6 py-4">Temperature (°C)</th>
-                            <th class="px-6 py-4">Humidity (%)</th>
-                        </tr>
-                    </thead>
-                    <tbody id="data-table-body" class="divide-y divide-zinc-800/50 text-sm text-zinc-300">
-                        <tr>
-                            <td colspan="3" class="px-6 py-8 text-center text-zinc-500 font-medium">
-                                <i class="fa-solid fa-spinner animate-spin mr-2"></i> Loading data from Google Sheets...
-                            </td>
-                        </tr>
-                    </tbody>
-                </table>
-            </div>
-        </div>
-
-    </main>
-
-    <script>
-        const targetUrl = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vQqbEuusjzmVepd22HRDbazmZEmZjJkUDZD5WDyf6Eh8sDzDwzAN_r5TPVHITDvwBjYa4hmwctCrlNM/pub?output=csv';
-
-        let tempChartInstance = null;
-        let humidityChartInstance = null;
-
-        function initCharts() {
-            const tempCtx = document.getElementById('tempChart').getContext('2d');
-            const tempGradient = tempCtx.createLinearGradient(0, 0, 0, 300);
-            tempGradient.addColorStop(0, 'rgba(245, 158, 11, 0.3)');
-            tempGradient.addColorStop(1, 'rgba(245, 158, 11, 0.0)');
-
-            tempChartInstance = new Chart(tempCtx, {
-                type: 'line',
-                data: { 
-                    labels: [], 
-                    datasets: [{ 
-                        label: 'Temperature (°C)', 
-                        data: [], 
-                        borderColor: '#f59e0b', 
-                        backgroundColor: tempGradient, 
-                        borderWidth: 2.5, 
-                        fill: true, 
-                        tension: 0.3,
-                        pointBackgroundColor: '#f59e0b',
-                        pointHoverRadius: 6
-                    }] 
+    // ตั้งค่ากราฟเริ่มต้น
+    const ctx = document.getElementById('weatherChart').getContext('2d');
+    const weatherChart = new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: [],
+            datasets: [
+                {
+                    label: 'อุณหภูมิ (°C)',
+                    data: [],
+                    borderColor: '#f39c12',
+                    backgroundColor: 'rgba(243, 156, 18, 0.1)',
+                    borderWidth: 2,
+                    pointBackgroundColor: 'white',
+                    pointBorderColor: '#f39c12',
+                    pointRadius: 3,
+                    fill: true,
+                    tension: 0.4
                 },
-                options: { 
-                    responsive: true, 
-                    maintainAspectRatio: false, 
-                    plugins: { legend: { display: false } }, 
-                    scales: { 
-                        y: { 
-                            grid: { color: 'rgba(255, 255, 255, 0.05)' },
-                            ticks: { color: '#a1a1aa', font: { family: 'Plus Jakarta Sans' } }
-                        }, 
-                        x: { 
-                            grid: { display: false },
-                            ticks: { color: '#a1a1aa', font: { family: 'Plus Jakarta Sans' } }
-                        } 
-                    } 
+                {
+                    label: 'ความชื้น (%)',
+                    data: [],
+                    borderColor: '#17a2b8',
+                    backgroundColor: 'rgba(23, 162, 184, 0.1)',
+                    borderWidth: 2,
+                    pointBackgroundColor: 'white',
+                    pointBorderColor: '#17a2b8',
+                    pointRadius: 3,
+                    fill: true,
+                    tension: 0.4
                 }
-            });
-
-            const humCtx = document.getElementById('humidityChart').getContext('2d');
-            const humGradient = humCtx.createLinearGradient(0, 0, 0, 300);
-            humGradient.addColorStop(0, 'rgba(99, 102, 241, 0.3)');
-            humGradient.addColorStop(1, 'rgba(99, 102, 241, 0.0)');
-
-            humidityChartInstance = new Chart(humCtx, {
-                type: 'line',
-                data: { 
-                    labels: [], 
-                    datasets: [{ 
-                        label: 'Humidity (%)', 
-                        data: [], 
-                        borderColor: '#6366f1', 
-                        backgroundColor: humGradient, 
-                        borderWidth: 2.5, 
-                        fill: true, 
-                        tension: 0.3,
-                        pointBackgroundColor: '#6366f1',
-                        pointHoverRadius: 6
-                    }] 
-                },
-                options: { 
-                    responsive: true, 
-                    maintainAspectRatio: false, 
-                    plugins: { legend: { display: false } }, 
-                    scales: { 
-                        y: { 
-                            grid: { color: 'rgba(255, 255, 255, 0.05)' },
-                            ticks: { color: '#a1a1aa', font: { family: 'Plus Jakarta Sans' } }
-                        }, 
-                        x: { 
-                            grid: { display: false },
-                            ticks: { color: '#a1a1aa', font: { family: 'Plus Jakarta Sans' } }
-                        } 
-                    } 
-                }
-            });
-        }
-
-        function parseCSV(text) {
-            const lines = text.split(/\r?\n/).filter(line => line.trim() !== '');
-            return lines.map(line => {
-                const regex = /(?:,|\n|^)("(?:(?:"")*[^"]*)*"|[^",\r\n]*)/g;
-                const matches = [];
-                let match;
-                while ((match = regex.exec(line)) !== null) {
-                    let val = match[1];
-                    if (val === undefined) val = '';
-                    val = val.replace(/^"|"$/g, '').replace(/""/g, '"').trim();
-                    matches.push(val);
-                }
-                return matches;
-            });
-        }
-
-        async function fetchData() {
-            const statusEl = document.getElementById('connection-status');
-            statusEl.innerHTML = `<span class="w-2 h-2 mr-2 bg-amber-400 rounded-full animate-ping"></span> Syncing...`;
-            statusEl.className = "inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-amber-950/60 text-amber-400 border border-amber-800/50";
-
-            // ใส่ timestamp ต่อท้าย URL เพื่อบังคับล้าง Cache
-            const cacheBusterUrl = targetUrl + '&_t=' + new Date().getTime();
-            const endpoints = [
-                'https://api.allorigins.win/raw?url=' + encodeURIComponent(cacheBusterUrl),
-                'https://corsproxy.io/?' + encodeURIComponent(cacheBusterUrl),
-                cacheBusterUrl
-            ];
-
-            let csvText = null;
-
-            for (const url of endpoints) {
-                try {
-                    const response = await fetch(url);
-                    if (response.ok) {
-                        csvText = await response.text();
-                        if (csvText && csvText.trim().length > 0) break;
+            ]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    position: 'top',
+                    labels: {
+                        usePointStyle: false,
+                        boxWidth: 40,
+                        boxHeight: 10,
+                        font: {
+                            family: "'Segoe UI', Tahoma, Geneva, Verdana, sans-serif"
+                        }
                     }
-                } catch (e) {
-                    console.warn(`Fetch failed for ${url}, trying next endpoint...`);
+                }
+            },
+            scales: {
+                y: {
+                    min: 20,
+                    max: 80, // ปรับลด-เพิ่มกรอบกราฟได้ที่นี่
+                    ticks: {
+                        stepSize: 5
+                    },
+                    grid: {
+                        color: '#f0f0f0'
+                    }
+                },
+                x: {
+                    grid: {
+                        color: '#f0f0f0'
+                    }
                 }
             }
-
-            if (!csvText) {
-                statusEl.innerHTML = `<span class="w-2 h-2 mr-2 bg-rose-500 rounded-full"></span> Sync Error`;
-                statusEl.className = "inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-rose-950/60 text-rose-400 border border-rose-800/50";
-                return;
-            }
-
-            try {
-                const rows = parseCSV(csvText);
-                if (rows.length === 0) throw new Error('Empty CSV payload');
-
-                const headers = rows[0];
-                const dataRows = rows.slice(1);
-
-                processAndDisplayData(headers, dataRows);
-
-                statusEl.innerHTML = `<span class="w-2 h-2 mr-2 bg-emerald-400 rounded-full animate-pulse"></span> Connected`;
-                statusEl.className = "inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-emerald-950/60 text-emerald-400 border border-emerald-800/50";
-            } catch (error) {
-                console.error('Data processing error:', error);
-                statusEl.innerHTML = `<span class="w-2 h-2 mr-2 bg-rose-500 rounded-full"></span> Data Error`;
-                statusEl.className = "inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-rose-950/60 text-rose-400 border border-rose-800/50";
-            }
         }
+    });
 
-        // ฟังก์ชันดึงเฉพาะตัวเลขที่ไม่ใช่ วันที่/เวลา และค่าต้องสมเหตุสมผล (-50 ถึง 100)
-        function extractValidSensorValue(val) {
-            if (val === undefined || val === null) return NaN;
-            const str = String(val).trim().replace(/"/g, '');
+    // ฟังก์ชันดึงข้อมูลจาก Google Sheets
+    async function fetchSheetData() {
+        try {
+            const response = await fetch(csvUrl);
+            const data = await response.text();
             
-            // ป้องกัน Timestamp (มีเครื่องหมาย / หรือ :)
-            if (str.includes('/') || str.includes(':') || str.length > 10) return NaN;
+            // แยกข้อมูลทีละบรรทัด และข้ามบรรทัดแรก (ที่เป็นหัวตาราง)
+            const rows = data.split('\n').slice(1);
             
-            const cleaned = str.replace(/[^0-9.-]/g, '');
-            if (cleaned === '' || isNaN(cleaned)) return NaN;
-            
-            const num = parseFloat(cleaned);
-            // ตรวจสอบช่วงค่าเซนเซอร์ที่ปกติ (เช่น อุณหภูมิ/ความชื้น ทั่วไปอยู่ระหว่าง -50 ถึง 100)
-            if (num < -50 || num > 100) return NaN;
-            
-            return num;
-        }
-
-        function extractRowData(row) {
-            let timestamp = '-';
-            let temp = NaN;
-            let humidity = NaN;
-
-            // ค้นหาข้อความที่เป็น Timestamp
-            for (let cell of row) {
-                const str = String(cell).trim().replace(/"/g, '');
-                if (str.includes('/') || str.includes(':')) {
-                    timestamp = str;
-                    break;
-                }
-            }
-
-            // ค้นหาตัวเลขเซนเซอร์ที่ถูกต้องจากทุกเซลล์ในแถว
-            const validNumbers = [];
-            for (let cell of row) {
-                const val = extractValidSensorValue(cell);
-                if (!isNaN(val)) {
-                    validNumbers.push(val);
-                }
-            }
-
-            if (validNumbers.length > 0) temp = validNumbers[0];
-            if (validNumbers.length > 1) humidity = validNumbers[1];
-
-            return { timestamp, temp, humidity };
-        }
-
-        function processAndDisplayData(headers, rows) {
             const labels = [];
-            const tempData = [];
-            const humidityData = [];
+            const temp = [];
+            const humid = [];
 
-            const tableBody = document.getElementById('data-table-body');
-            tableBody.innerHTML = '';
-
-            rows.forEach((row, index) => {
-                if (!row || row.length === 0) return;
-
-                const { timestamp, temp, humidity } = extractRowData(row);
-
-                labels.push(timestamp !== '-' ? timestamp : `Row #${index + 1}`);
-                tempData.push(isNaN(temp) ? 0 : temp);
-                humidityData.push(isNaN(humidity) ? 0 : humidity);
+            // วนลูปอ่านข้อมูลทีละแถว
+            rows.forEach(row => {
+                const cols = row.split(','); // แยกคอลัมน์ด้วยเครื่องหมายจุลภาค
+                // เช็คว่ามีข้อมูลครบ 3 คอลัมน์ และไม่ใช่บรรทัดว่าง
+                if (cols.length >= 3 && cols[0].trim() !== '') {
+                    labels.push(cols[0].trim());           // คอลัมน์ A (เวลา)
+                    temp.push(parseFloat(cols[1].trim()));   // คอลัมน์ B (อุณหภูมิ)
+                    humid.push(parseFloat(cols[2].trim()));  // คอลัมน์ C (ความชื้น)
+                }
             });
 
-            // ตารางแสดงผลย้อนกลับ (ล่าสุดอยู่บนสุด)
-            const reversedRows = [...rows].reverse();
-            reversedRows.forEach((row) => {
-                if (!row || row.length === 0) return;
+            // อัปเดตข้อมูลในกราฟ
+            weatherChart.data.labels = labels;
+            weatherChart.data.datasets[0].data = temp;
+            weatherChart.data.datasets[1].data = humid;
+            weatherChart.update();
 
-                const { timestamp, temp, humidity } = extractRowData(row);
-
-                const tr = document.createElement('tr');
-                tr.className = "hover:bg-zinc-800/30 transition-colors";
-                tr.innerHTML = `
-                    <td class="px-6 py-4 font-mono text-xs text-zinc-400">${timestamp}</td>
-                    <td class="px-6 py-4 font-semibold text-amber-400">${!isNaN(temp) ? temp + ' °C' : '--'}</td>
-                    <td class="px-6 py-4 font-semibold text-indigo-400">${!isNaN(humidity) ? humidity + ' %' : '--'}</td>
-                `;
-                tableBody.appendChild(tr);
-            });
-
-            // อัปเดตการ์ดข้อมูลล่าสุด
-            if (rows.length > 0) {
-                const lastRow = rows[rows.length - 1];
-                const { timestamp, temp, humidity } = extractRowData(lastRow);
-
-                document.getElementById('latest-temp').textContent = !isNaN(temp) ? temp : '--';
-                document.getElementById('latest-humidity').textContent = !isNaN(humidity) ? humidity : '--';
-                
-                document.getElementById('temp-status').innerHTML = `<i class="fa-regular fa-clock mr-1.5"></i> Updated: ${timestamp}`;
-                document.getElementById('humidity-status').innerHTML = `<i class="fa-regular fa-clock mr-1.5"></i> Updated: ${timestamp}`;
+            // อัปเดตตัวเลขปัจจุบัน (ดึงค่าจากแถวสุดท้ายที่มีข้อมูล)
+            if (temp.length > 0 && !isNaN(temp[temp.length - 1])) {
+                document.getElementById('current-temp').innerText = temp[temp.length - 1] + ' °C';
+                document.getElementById('current-humid').innerText = humid[humid.length - 1] + ' %';
             }
 
-            document.getElementById('record-count').textContent = `${rows.length} entries`;
+            document.getElementById('status-text').innerText = `อัปเดตข้อมูลล่าสุดเมื่อ: ${new Date().toLocaleTimeString('th-TH')}`;
 
-            // อัปเดตกราฟ
-            tempChartInstance.data.labels = labels;
-            tempChartInstance.data.datasets[0].data = tempData;
-            tempChartInstance.update();
-
-            humidityChartInstance.data.labels = labels;
-            humidityChartInstance.data.datasets[0].data = humidityData;
-            humidityChartInstance.update();
+        } catch (error) {
+            console.error("เกิดข้อผิดพลาดในการดึงข้อมูล:", error);
+            document.getElementById('status-text').innerText = "เชื่อมต่อล้มเหลว โปรดตรวจสอบลิงก์ หรือตั้งค่าการแชร์ Sheets";
+            document.getElementById('status-text').style.color = "red";
         }
+    }
 
-        window.onload = () => {
-            initCharts();
-            fetchData();
-            setInterval(fetchData, 30000);
-        };
-    </script>
+    // เรียกใช้ฟังก์ชันทันทีเมื่อเปิดหน้าเว็บ
+    fetchSheetData();
+
+    // ตั้งเวลาให้รีเฟรชข้อมูลอัตโนมัติทุกๆ 60 วินาที (60000 ms)
+    setInterval(fetchSheetData, 60000);
+
+</script>
+
 </body>
 </html>
